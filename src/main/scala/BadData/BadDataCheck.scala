@@ -2,6 +2,7 @@ package BadData
 
 import java.io.{BufferedReader, File, FileReader}
 import scala.collection.mutable
+import scala.io.Source
 
 /**
  * This object is specifically to create psql queries to find bad data.
@@ -54,8 +55,20 @@ class BadDataCheck(){
     var customTableName = ""
 
     val bufferedReader = new BufferedReader(new FileReader(file))
-    bufferedReader.lines().forEach(s => customTableName = customTableName ++ s ++ "\n")
+    bufferedReader.lines().forEach(s => customTableName += s ++ "\n")
     bufferedReader.close()
+
+    val tableRegex = "(Some|Option)\\(\"[a-z,A-Z]*\"\\),*\r*\n*\\s*[_tableName = ]*\"[a-z,A-_]*\"".r
+    val firstMatchTable = tableRegex.findFirstIn(customTableName)
+    val firstTableSplit = firstMatchTable.map(st => st.split("\""))
+    firstTableSplit.get(1) ++ "." ++ firstTableSplit.get(3)
+  }
+
+  private def getNameResource() = {
+    var customTableName = ""
+
+    val in = Source.fromResource("BadDataTableTemp")
+    in.getLines.foreach(s => customTableName += s ++ "\n")
 
     val tableRegex = "(Some|Option)\\(\"[a-z,A-Z]*\"\\),*\r*\n*\\s*[_tableName = ]*\"[a-z,A-_]*\"".r
     val firstMatchTable = tableRegex.findFirstIn(customTableName)
@@ -101,6 +114,46 @@ class BadDataCheck(){
     val finalSql = orCases.substring(0,orCases.length -3)
     val finalQuery = s"${findQuery.mkString.dropRight(1)} from $tableName where $finalSql"
     println("\\copy (" +finalQuery + s") TO '$path$name' HEADER;")
+  }
+
+  /**
+   * Version of the checkBadData intended to be used
+   * when copying the file contents of a single table is
+   * easier than copying all the files to a new dir.
+   *
+   * Copy the table information (whole file is fine) into the
+   * resources.BadDataTableTemp file before running.
+   *
+   * @param outputPath  This should be a directory for storing the
+   *                    output of the sql query created by the method
+   */
+  def checkResource(outputPath: String)={
+    val in = Source.fromResource("BadDataTableTemp")
+    val tableName = getNameResource()
+    val optionRegex = "column\\[[a-z,A-Z]*]\\(\".*\".*\\)".r
+    val columnRegex = "\".*\"".r
+    val sqlNonOptions =new mutable.StringBuilder()
+    val findQuery = new mutable.StringBuilder("Select ")
+    var columns = List[String]("")
+    val strings = in.getLines.foreach { line =>
+      val regmatch = optionRegex.findFirstIn(line)
+      regmatch.map(matches => columns = columns ++ List(matches))
+    }
+    columns = columns.drop(1)
+    val maybeNonOptionalColumn = columns.map { str =>
+      val columnname = columnRegex.findFirstIn(str)
+      findQuery ++= columnname.get.dropRight(1).drop(1) + ","
+      columnname
+    }
+    maybeNonOptionalColumn.foreach{
+      case Some(string) => sqlNonOptions++=(string.substring(1,string.length - 1))
+        sqlNonOptions++=" is null OR "
+      case None =>
+    }
+    val orCases = sqlNonOptions.mkString
+    val finalSql = orCases.substring(0,orCases.length -3)
+    val finalQuery = s"${findQuery.mkString.dropRight(1)} from $tableName where $finalSql"
+    println("\\copy (" +finalQuery + s") TO '$outputPath$tableName' HEADER;")
   }
 }
 

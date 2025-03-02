@@ -1,0 +1,17 @@
+target
+out
+build
+.idea
+.bsp
+*.class
+*.log
+**/resources/local.conf
+.metals/
+.bloop/
+.ammonite/
+metals.sbt
+.vscode
+pg_dumps/
+*.dump
+override.conf
+.DS_Store
