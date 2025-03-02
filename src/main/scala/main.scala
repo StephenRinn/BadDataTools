@@ -9,6 +9,8 @@ object main {
   def main(args: Array[String]): Unit = {
     //runBadData(inputDir = ???, outputDir = ???)
     //runBadDataResourceFile(outputDir = ???)
+    //runBadDataSingleFile(absolutePathInput = ???)
+    //runBadDataSingleFile(outputDir = ???, absolutePathInput = ???)
     Right(true)
   }
 
@@ -33,5 +35,13 @@ object main {
    */
   def runBadDataResourceFile(outputDir: String): Unit = {
     badData.checkResource(outputDir)
+  }
+
+  def runBadDataSingleFile(outputDir: String, absolutePathInput: String) = {
+    badData.checkSingleFile(absolutePathInput, outputDir)
+  }
+
+  def runBadDataSingleFile(absolutePathInput: String) = {
+    badData.checkSingleFile(absolutePathInput)
   }
 }

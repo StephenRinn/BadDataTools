@@ -155,6 +155,21 @@ class BadDataCheck(){
     val finalQuery = s"${findQuery.mkString.dropRight(1)} from $tableName where $finalSql"
     println("\\copy (" +finalQuery + s") TO '$outputPath$tableName' HEADER;")
   }
+
+  /**
+   * Creates a bad data query with an output to the pathOutput directory.
+   * Best use when you can quickly grab the absolute path for a single table to
+   * quickly check for bad data
+   *
+   * @param absolutePathInput Table to be parsed for the query
+   * @param pathOutput        Where the files will be placed for review
+   *                          defaults to /Users/Shared/BadDataOutput/
+   */
+  def checkSingleFile(absolutePathInput: String, pathOutput: String = "/Users/Shared/BadDataOutput/"): Unit = {
+    val file = new File(absolutePathInput)
+    val name = getName(file)
+    check(name, pathOutput, file)
+  }
 }
 
 

@@ -15,3 +15,4 @@ pg_dumps/
 *.dump
 override.conf
 .DS_Store
+/target/
