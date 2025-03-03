@@ -105,6 +105,8 @@ class BadDataCheck(){
       findQuery ++= columnname.get.dropRight(1).drop(1) + ","
       columnname
     }
+    // Gets full object so you can id offending record if PK is optional in code
+    findQuery ++= "* "
     maybeNonOptionalColumn.foreach{
       case Some(string) => sqlNonOptions++=(string.substring(1,string.length - 1))
         sqlNonOptions++=" is null OR "
@@ -145,6 +147,8 @@ class BadDataCheck(){
       findQuery ++= columnname.get.dropRight(1).drop(1) + ","
       columnname
     }
+    // Gets full object so you can id offending record if PK is optional in code
+    findQuery ++= "* "
     maybeNonOptionalColumn.foreach{
       case Some(string) => sqlNonOptions++=(string.substring(1,string.length - 1))
         sqlNonOptions++=" is null OR "

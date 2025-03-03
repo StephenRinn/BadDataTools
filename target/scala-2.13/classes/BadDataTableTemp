@@ -1,121 +1,174 @@
 package us.fringe.service.base.db
 
 import com.github.javafaker.Faker
+import slick.ast.BaseTypedType
+import slick.jdbc.JdbcType
 import slick.jdbc.PostgresProfile.api._
+import us.fringe.service.base.model.integration.{IntegrationState, Slug}
+import us.fringe.service.base.model.profile._
 
-import java.time.{LocalDateTime, ZoneOffset}
-import java.util.UUID
-import scala.util.Random
+import java.time.LocalDateTime
+import scala.concurrent.Future
+import scala.language.implicitConversions
 
-class PointReceiptTable(tag: Tag)
-    extends Table[PointReceiptRecord](tag, Some("salesforce"), "points_receipt__c") {
-  def createdDate = column[Option[LocalDateTime]]("createddate")
-  def isDeleted = column[Boolean]("isdeleted")
-  def name = column[Option[String]]("name")
-  def systemModstamp = column[Option[LocalDateTime]]("systemmodstamp")
-  def benefitId = column[Option[String]]("benefit__c")
-  def contactId = column[String]("contact__c")
-  def benefitHerokuId = column[Option[String]]("benefit__r__heroku_id__c")
-  def pointsSpent = column[Double]("points_spent__c")
-  def sfid = column[Option[String]]("sfid")
+class AccountIntegrationTable(tag: Tag)
+    extends Table[AccountIntegrationRecord](tag, Option("integration"), "account_integration") {
+
+  implicit lazy val slugMapper: JdbcType[Slug] with BaseTypedType[Slug] = AccountIntegrationTable.slugMapper
+
   def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-  def hcLastop = column[Option[String]]("_hc_lastop")
-  def hcErr = column[Option[String]]("_hc_err")
-  def pointTermId = column[Option[String]]("points__c")
-  def pointTermHerokuId = column[Option[String]]("points__r__heroku_id__c")
-  def herokuId = column[Option[String]]("heroku_id__c")
-  def givenToPointTermId = column[Option[String]]("points_given_to__c")
-  def givenToPointTermHerokuId = column[Option[String]]("points_given_to__r__heroku_id__c")
-  def giftOrderId = column[Option[String]]("gift_order_id__c")
+  def slug = column[Slug]("slug")
+  def name = column[String]("name")
+  def isPageActive = column[Boolean]("page_active")
+  def pageHeader = column[Option[String]]("page_header")
+  def pageText = column[Option[String]]("page_text")
+  def pageLogoUrl = column[Option[String]]("page_logo_url")
+  def connectUrl = column[Option[String]]("connect_url")
+  def archivedAt = column[Option[LocalDateTime]]("archived_at")
   def * =
     (
-      createdDate,
-      isDeleted,
-      name,
-      systemModstamp,
-      benefitId,
-      contactId,
-      benefitHerokuId,
-      pointsSpent,
-      sfid,
       id,
-      hcLastop,
-      hcErr,
-      pointTermId,
-      pointTermHerokuId,
-      herokuId,
-      givenToPointTermId,
-      givenToPointTermHerokuId,
-      giftOrderId
-    ) <> (PointReceiptRecord.tupled, PointReceiptRecord.unapply)
+      slug,
+      name,
+      isPageActive,
+      pageHeader,
+      pageText,
+      pageLogoUrl,
+      connectUrl,
+      archivedAt
+    ) <> (AccountIntegrationRecord.tupled, AccountIntegrationRecord.unapply)
 }
 
-case class PointReceiptRecord(
-    createdDate: Option[LocalDateTime],
-    isDeleted: Boolean,
-    name: Option[String],
-    systemModstamp: Option[LocalDateTime],
-    benefitId: Option[String],
-    contactId: String,
-    benefitHerokuId: Option[String],
-    pointsSpent: Double,
-    sfid: Option[String],
+object AccountIntegrationTable {
+  implicit lazy val slugMapper: JdbcType[Slug] with BaseTypedType[Slug] =
+    MappedColumnType
+      .base[Slug, String](e => e.toString, s => Slug.withName(s))
+
+  implicit def toAccountIntegrationLike(
+      integrationConnectionAndFinchSync: (
+          (
+              AccountIntegrationRecord,
+              Option[(AccountIntegrationConnectionRecord, Option[SlackMetadataRecord])]
+          ),
+          Option[FinchSyncRecord]
+      )
+  ): AccountIntegrationLike = {
+    val integration = integrationConnectionAndFinchSync._1._1
+    val connection = integrationConnectionAndFinchSync._1._2.map(_._1)
+    val finchSync = integrationConnectionAndFinchSync._2
+    val slackMetadata = integrationConnectionAndFinchSync._1._2.flatMap(_._2)
+
+    if (finchSync.isDefined) {
+      FinchAccountIntegration(
+        id = integration.id,
+        slug = integration.slug,
+        name = integration.name,
+        pageHeader = integration.pageHeader,
+        pageText = integration.pageText,
+        pageLogoUrl = integration.pageLogoUrl,
+        connectUrl = integration.connectUrl,
+        state = {
+          if (connection.isDefined) connection.get.state
+          else IntegrationState.None
+        },
+        lastSyncStatus = finchSync.get.status
+      )
+    } else {
+      AccountIntegration(
+        id = integration.id,
+        slug = integration.slug,
+        name = integration.name,
+        pageHeader = integration.pageHeader,
+        pageText = integration.pageText,
+        pageLogoUrl = integration.pageLogoUrl,
+        connectUrl = integration.connectUrl,
+        state = {
+          if (connection.isDefined) connection.get.state
+          else IntegrationState.None
+        },
+        channel = slackMetadata.map(_.webhookChannel)
+      )
+    }
+  }
+
+  implicit def toUserAccountIntegration(
+      integrationAndConnection: (
+          AccountIntegrationRecord,
+          Option[(AccountIntegrationConnectionRecord, Option[SlackMetadataRecord])]
+      )
+  ): UserAccountIntegration = {
+    UserAccountIntegration(
+      id = integrationAndConnection._1.id,
+      slug = integrationAndConnection._1.slug,
+      name = integrationAndConnection._1.name,
+      state = integrationAndConnection._2.map(_._1.state).getOrElse(IntegrationState.None),
+      channel = integrationAndConnection._2.flatMap(_._2.map(_.webhookChannel))
+    )
+  }
+
+}
+
+case class AccountIntegrationRecord(
     id: Long,
-    hcLastop: Option[String],
-    hcErr: Option[String],
-    pointTermId: Option[String],
-    pointTermHerokuId: Option[String],
-    herokuId: Option[String],
-    givenToPointTermId: Option[String],
-    givenToPointTermHerokuId: Option[String],
-    giftOrderId: Option[String]
+    slug: Slug,
+    name: String,
+    isPageActive: Boolean,
+    pageHeader: Option[String],
+    pageText: Option[String],
+    pageLogoUrl: Option[String],
+    connectUrl: Option[String],
+    archivedAt: Option[LocalDateTime]
 )
 
-class PointReceiptFactory(val db: Database, val faker: Faker) {
-  val pointReceipts = TableQuery[PointReceiptTable]
+class AccountIntegrationFactory(val db: Database, val faker: Faker) {
+  val accountIntegrations = TableQuery[AccountIntegrationTable]
+
+  def build(
+      slug: Slug = Slug.Slack,
+      name: String = faker.company().name(),
+      isPageActive: Boolean = true,
+      pageHeader: Option[String] = Some(faker.lorem().sentence(5)),
+      pageText: Option[String] = Some(faker.lorem().paragraph(3)),
+      pageLogoUrl: Option[String] = Some(faker.internet().url()),
+      connectUrl: Option[String] = Some(faker.internet().url()),
+      archivedAt: Option[LocalDateTime] = None
+  ): AccountIntegrationRecord = {
+    AccountIntegrationRecord(
+      id = 0,
+      slug = slug,
+      name = name,
+      isPageActive = isPageActive,
+      pageHeader = pageHeader,
+      pageText = pageText,
+      pageLogoUrl = pageLogoUrl,
+      connectUrl = connectUrl,
+      archivedAt = archivedAt
+    )
+  }
 
   def create(
-      createdDate: Option[LocalDateTime] = Some(LocalDateTime.now(ZoneOffset.UTC)),
-      isDeleted: Boolean = false,
-      name: Option[String] = Some(f"PR - ${UUID.randomUUID().toString.substring(0, 7)}"),
-      systemModstamp: Option[LocalDateTime] = Some(LocalDateTime.now(ZoneOffset.UTC)),
-      benefitId: Option[String] = Some(UUID.randomUUID().toString.substring(0, 17)),
-      contactId: String = UUID.randomUUID().toString.substring(0, 17),
-      benefitHerokuId: Option[String] = None,
-      pointsSpent: Double = 0.0,
-      sfid: Option[String] = Some(UUID.randomUUID().toString.substring(0, 17)),
-      id: Long = Random.nextInt().toLong,
-      hcLastop: Option[String] = Some("SYNCED"),
-      hcErr: Option[String] = None,
-      pointTermId: Option[String] = Some(UUID.randomUUID().toString.substring(0, 17)),
-      pointTermHerokuId: Option[String] = None,
-      herokuId: Option[String] = Some(UUID.randomUUID().toString.substring(0, 17)),
-      givenToPointTermId: Option[String] = Some(UUID.randomUUID().toString.substring(0, 17)),
-      givenToPointTermHerokuId: Option[String] = None,
-      giftOrderId: Option[String] = None
-  ) = {
-    val pointReceiptRecord = PointReceiptRecord(
-      createdDate = createdDate,
-      isDeleted = isDeleted,
+      slug: Slug = Slug.Slack,
+      name: String = faker.company().name(),
+      isPageActive: Boolean = true,
+      pageHeader: Option[String] = Some(faker.lorem().sentence(5)),
+      pageText: Option[String] = Some(faker.lorem().paragraph(3)),
+      pageLogoUrl: Option[String] = Some(faker.internet().url()),
+      connectUrl: Option[String] = Some(faker.internet().url()),
+      archivedAt: Option[LocalDateTime] = None
+  ): Future[AccountIntegrationRecord] = {
+    val integration = build(
+      slug = slug,
       name = name,
-      systemModstamp = systemModstamp,
-      benefitId = benefitId,
-      contactId = contactId,
-      benefitHerokuId = benefitHerokuId,
-      pointsSpent = pointsSpent,
-      sfid = sfid,
-      id = id,
-      hcLastop = hcLastop,
-      hcErr = hcErr,
-      pointTermId = pointTermId,
-      pointTermHerokuId = pointTermHerokuId,
-      herokuId = herokuId,
-      givenToPointTermId = givenToPointTermId,
-      givenToPointTermHerokuId = givenToPointTermHerokuId,
-      giftOrderId = giftOrderId
+      isPageActive = isPageActive,
+      pageHeader = pageHeader,
+      pageText = pageText,
+      pageLogoUrl = pageLogoUrl,
+      connectUrl = connectUrl,
+      archivedAt = archivedAt
     )
 
-    val insertAction = pointReceipts returning pointReceipts += pointReceiptRecord
+    val insertAction = accountIntegrations returning accountIntegrations += integration
     db.run(insertAction)
   }
+
 }
