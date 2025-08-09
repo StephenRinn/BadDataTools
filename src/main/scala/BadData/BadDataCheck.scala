@@ -8,28 +8,10 @@ import scala.io.Source
  * This object is specifically to create psql queries to find bad data.
  *
  * In this case bad data is data which can not be null as it is not an option.
- * The early schemas did not enforce not null, so we occasionally have bad data
- * inserted by either salesforce users, or engineer mistake.
- *
- * To use -
- *  1.  Set variables that are computer specific
- *      a.  dir               - Where the tables to parse are
- *      b.  badDataOutputDir  - Where to print the bad data files
- *  2.  Create a copy of all base tables you want to check and place in dir
- *  3.  Run Main method
- *  4.  Instead of running a query in PgAdmin, open a psql query in PGAdmin
- *  5.  Run Query copied from output line
+ * The early schemas did not enforce not null.
  */
 class BadDataCheck(){
-  def run(inputDir: String, outputDir: String):Unit ={
-    /*
-    This is the folder you should copy current DB tables to check for bad data.
-    I suggest only pulling a few files in to check for the data to ensure you are
-    not bogging down the system.
-
-    THIS IS UNTESTED FOR ALL TABLES AT ONCE -> IF YOU BREAK SOMETHING USING THIS
-    ON ALL TABLES I TAKE NO RESPONSIBILITY
-     */
+  def run(inputDir: String, outputDir: String): Unit = {
     val dir = ""
     new File(dir).listFiles().foreach{ file =>
       // Fails on db.scala, excluded in case of accidental copying
@@ -91,9 +73,6 @@ class BadDataCheck(){
      Since we don't have to worry about multiple matches on one line I simplified the regex
      however this will fail if we even have multiple lines for a single column, or
      if we have multiple on one line. Not a super simple fix, so I don't want to.
-
-     Even still, it will only cause a problem if the broken up line is non optional
-     or if both of the columns on a single line are non optional.
     */
     bufferedReader.lines().forEach { line =>
       val regmatch = optionRegex.findFirstIn(line)
@@ -169,7 +148,9 @@ class BadDataCheck(){
    * @param pathOutput        Where the files will be placed for review
    *                          defaults to /Users/Shared/BadDataOutput/
    */
-  def checkSingleFile(absolutePathInput: String, pathOutput: String = "/Users/Shared/BadDataOutput/"): Unit = {
+  def checkSingleFile(absolutePathInput: String,
+                      pathOutput: String = "/Users/Shared/BadDataOutput/"
+                     ): Unit = {
     val file = new File(absolutePathInput)
     val name = getName(file)
     check(name, pathOutput, file)
