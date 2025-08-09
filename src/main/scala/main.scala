@@ -2,6 +2,8 @@ import BadData._
 
 /**
  * To use, uncomment method you want to run, then run main.
+ *
+ * TODO fix inputs and outputs with env vars or default values to remove need for commenting
  */
 object main {
   private val badData = new BadDataCheck
@@ -17,8 +19,6 @@ object main {
   /**
    * Creates query to look for bad data from table files
    *
-   * PLEASE READ the run function scala docs before using!
-   *
    * @param inputDir  Directory where the copied tables are located
    * @param outputDir Directory the bad data will be exported to
    */
@@ -28,8 +28,6 @@ object main {
 
   /**
    * Creates query to look for bad data from table files
-   *
-   * PLEASE READ the run function scala docs before using!
    *
    * @param outputDir Directory the bad data will be exported to
    */
