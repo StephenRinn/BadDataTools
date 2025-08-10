@@ -97,7 +97,7 @@ object main {
         badDataChecker.checkSingleFile(absolutePath, output)
       case (Some(absolutePath),None) =>
         badDataChecker.checkSingleFile(absolutePath)
-      case _ => _
+      case _ => None
     }
 
   }

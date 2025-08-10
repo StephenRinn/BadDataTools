@@ -1,0 +1,17 @@
+import slick.jdbc.PostgresProfile.api._
+import slick.lifted.{ProvenShape, Tag}
+
+
+object BadData {
+    class UserTable(tag: Tag) extends Table[User](tag, Some("BadData"), "User") {
+
+    def id: Rep[Int] = column[Int]("id", O.PrimaryKey, O.AutoInc)
+    def name: Rep[String] = column[String]("name")
+    def address: Rep[Option[String]] = column[Option[String]]("address")
+    def isEligible: Rep[Boolean] = column[Boolean]("is_eligible")
+
+    def * : ProvenShape[User] = (id, name, address, isEligible) <> (User.tupled, User.unapply)
+  }
+
+  case class User(id: Int, name: String, address: Option[String], isEligible: Boolean)
+}

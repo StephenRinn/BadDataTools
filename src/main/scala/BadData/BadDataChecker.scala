@@ -85,14 +85,14 @@ class BadDataChecker{
     // Gets full object so you can id offending record if PK is optional in code
     findQuery ++= "* "
     maybeNonOptionalColumn.foreach{
-      case Some(string) => sqlNonOptions++= string.substring(1,string.length - 1)
-        sqlNonOptions++=" is null OR "
+      case Some(string) => sqlNonOptions ++= string.substring(1,string.length - 1)
+        sqlNonOptions ++= " is null OR "
       case None =>
     }
     val orCases = sqlNonOptions.mkString
     val finalSql = orCases.substring(0,orCases.length -3)
     val finalQuery = s"${findQuery.mkString.dropRight(1)} from $tableName where $finalSql"
-    println("\\copy (" +finalQuery + s") TO '$path$name' HEADER;")
+    println("\\copy (" +finalQuery + s") TO '$path$name' CSV HEADER;")
   }
 
   /**
@@ -137,7 +137,7 @@ class BadDataChecker{
       val finalSql = orCases.substring(0,orCases.length -3)
       val finalQuery = s"${findQuery.mkString.dropRight(1)} from $tableName where $finalSql"
       println(s"\n\nrunBadDataResourceFile - Setting up Query with outputDir: $outputPath\n\n")
-      println("\\copy (" + finalQuery + s") TO '$outputPath$tableName' HEADER;")
+      println("\\copy (" + finalQuery + s") TO '$outputPath$tableName' CSV HEADER;")
       println(s"\n\n End of query for resource with outputDir: $outputPath")
     } catch {
       case e: Exception =>
