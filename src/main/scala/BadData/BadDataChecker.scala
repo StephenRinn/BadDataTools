@@ -10,6 +10,8 @@ import scala.util.{Try, Using}
  *
  * In this case bad data is data which can not be null as it is not an option.
  * The early schemas did not enforce not null.
+ *
+ * TODO Scaladoc methods
  */
 class BadDataChecker{
   private def readFile(file: File): Option[String] = {
