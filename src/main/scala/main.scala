@@ -20,17 +20,17 @@ object main {
    * Some|Option ("schemaName"), "tableName"
    *
    * Column -
-   * def foo = column[Option[String]]("foo")
+   * {{{def foo = column[Option[String]]("foo")}}}
    *
    * @param args Command-line arguments:
-   *             -  inputDir - Path to the directory containing all table definitions
+   *             -  inputPath - Path to the directory containing all table definitions
+   *                            or to Single table definition file
    *             -  outputDir - Path generated query will write results to
-   *             -  absolutePath - Absolute path to single table definition to limit query size
    *
-   * Example:
-   *    {{{
-   *      scala BadDataTools --inputDir ./foo --outputDir ./foo/bar --absolutePath /abs/foobar.scala
-   *    }}}
+   * @example
+   * {{{
+   *   scala BadDataTools --inputPath ./foo --outputDir ./foo/bar
+   * }}}
    */
   def main(args: Array[String]): Unit = {
     def getArg(name: String, default: Option[String] = None): Option[String] = {
@@ -41,64 +41,16 @@ object main {
         case idx => Some(args(idx + 1))
       }
     }
-    val inputDir = getArg("inputDir")
+
     val outputDir = getArg("outputDir")
-    val absolutePathInput = getArg("absolutePath")
+    val pathInput = getArg("inputPath")
 
-    runBadData(inputDir = inputDir, outputDir = outputDir)
-    runBadDataResourceFile(outputDir = outputDir)
-    runBadDataSingleFile(outputDir = outputDir, absolutePathInput = absolutePathInput)
-  }
-
-  /**
-   * Creates query to look for bad data from table files
-   *
-   * @param inputDir  Directory where the copied tables are located
-   * @param outputDir Directory the bad data will be exported to
-   */
-  private def runBadData(inputDir: Option[String] = None,
-                         outputDir: Option[String] = None
-                ): Unit = {
-    (inputDir,outputDir) match {
-      case (Some(input), Some(output)) =>
-        println(s"\n\nrunBadData - Setting up Query with inputDir: $input outputDir: $output\n\n")
-        badDataChecker.run(inputDir = input, outputDir = output)
-        println(s"\n\n END OF QUERY for inputDir: $input outputDir: $output")
-      case _ => None
+    badDataChecker.resourceQueryBuilder(outputPath = outputDir)
+    // Only perform queryBuilder if a path is defined
+    pathInput match {
+      case Some(path) =>
+        badDataChecker.queryBuilder(path = path, outputPath = outputDir)
+      case None => -1
     }
-  }
-
-  /**
-   * Creates query to look for bad data from table files
-   *
-   * @param outputDir Directory the bad data will be exported to
-   */
-  private def runBadDataResourceFile(outputDir: Option[String] = None): Unit = {
-    outputDir match {
-      case Some(output) =>
-        badDataChecker.checkResource(output)
-      case None =>
-        badDataChecker.checkResource()
-    }
-
-  }
-
-  /**
-   * Creates a query to find bad data from single input file
-   *
-   * @param outputDir Directory the bad data will be exported to
-   * @param absolutePathInput Absolute path to single table file
-   */
-  private def runBadDataSingleFile(outputDir: Option[String] = None,
-                                   absolutePathInput: Option[String] = None
-                                  ): Unit = {
-    (absolutePathInput, outputDir) match {
-      case (Some(absolutePath),Some(output)) =>
-        badDataChecker.checkSingleFile(absolutePath, output)
-      case (Some(absolutePath),None) =>
-        badDataChecker.checkSingleFile(absolutePath)
-      case _ => None
-    }
-
   }
 }

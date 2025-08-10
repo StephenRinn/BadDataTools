@@ -12,13 +12,12 @@ Only real use is when the database is not fully in control of a single team, suc
 
 ## Arguments
 
-| Argument      | Description                                                                 |
-|---------------|-----------------------------------------------------------------------------|
-| `--inputDir`  | Directory containing one or more Slick table definition files              |
-| `--outputDir` | Destination directory for the generated SQL files *(Default: `/Users/Shared/`)* |
-| `--absolutePath` | Absolute path to a single Scala file with a Slick table definition       |
+| Argument         | Description                                                   |
+|------------------|---------------------------------------------------------------|
+| `--inputPath`    | Directory containing one or more Slick table definition files |
+| `--outputDir`    | Destination directory for the generated SQL files             |        
 
 ## Example
 
 ```
-scala BadDataTools --inputDir ./foo --outputDir ./foo/bar --absolutePath /abs/foobar.scala
+scala BadDataTools --inputPath ./foo --outputDir ./foo/bar
