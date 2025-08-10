@@ -10,16 +10,14 @@ import scala.io.Source
  * In this case bad data is data which can not be null as it is not an option.
  * The early schemas did not enforce not null.
  */
-class BadDataCheck(){
+class BadDataChecker{
   def run(inputDir: String, outputDir: String): Unit = {
-    val dir = ""
-    new File(dir).listFiles().foreach{ file =>
+    new File(inputDir).listFiles().foreach{ file =>
       // Fails on db.scala, excluded in case of accidental copying
       if(file.getName != "db.scala"){
         val name = getName(file)
         //This is the folder the psql query will dump all bad data into.
-        val badDataOutputDir = ""
-        check(name,badDataOutputDir, file)
+        check(name, outputDir, file)
       }
     }
   }
@@ -33,7 +31,7 @@ class BadDataCheck(){
    * @param file: Table file to parse for possible missing required fields
    * @return      Table name to complete future SQL queries
    */
-  def getName(file: File): String = {
+  private def getName(file: File): String = {
     var customTableName = ""
 
     val bufferedReader = new BufferedReader(new FileReader(file))
@@ -46,7 +44,7 @@ class BadDataCheck(){
     firstTableSplit.get(1) ++ "." ++ firstTableSplit.get(3)
   }
 
-  private def getNameResource() = {
+  private def getNameResource = {
     var customTableName = ""
 
     val in = Source.fromResource("BadDataTableTemp")
@@ -58,9 +56,9 @@ class BadDataCheck(){
     firstTableSplit.get(1) ++ "." ++ firstTableSplit.get(3)
   }
 
-  def check(name: String,
-            path: String,
-            file: File
+  private def check(name: String,
+                    path: String,
+                    file: File
            ): Unit= {
     val bufferedReader = new BufferedReader(new FileReader(file))
     val tableName = name
@@ -87,7 +85,7 @@ class BadDataCheck(){
     // Gets full object so you can id offending record if PK is optional in code
     findQuery ++= "* "
     maybeNonOptionalColumn.foreach{
-      case Some(string) => sqlNonOptions++=(string.substring(1,string.length - 1))
+      case Some(string) => sqlNonOptions++= string.substring(1,string.length - 1)
         sqlNonOptions++=" is null OR "
       case None =>
     }
@@ -106,37 +104,46 @@ class BadDataCheck(){
    * resources.BadDataTableTemp file before running.
    *
    * @param outputPath  This should be a directory for storing the
-   *                    output of the sql query created by the method
+   *                    output of the sql query created by the method.
+   *                    Defaults to "/Users/Shared/"
    */
-  def checkResource(outputPath: String)={
-    val in = Source.fromResource("BadDataTableTemp")
-    val tableName = getNameResource()
-    val optionRegex = "column\\[[a-z,A-Z]*]\\(\".*\".*\\)".r
-    val columnRegex = "\".*\"".r
-    val sqlNonOptions =new mutable.StringBuilder()
-    val findQuery = new mutable.StringBuilder("Select ")
-    var columns = List[String]("")
-    val strings = in.getLines.foreach { line =>
-      val regmatch = optionRegex.findFirstIn(line)
-      regmatch.map(matches => columns = columns ++ List(matches))
+  def checkResource(outputPath: String = "/Users/Shared/"): Unit = {
+    try {
+      val in = Source.fromResource("BadDataTableTemp")
+      val tableName = getNameResource
+      val optionRegex = "column\\[[a-z,A-Z]*]\\(\".*\".*\\)".r
+      val columnRegex = "\".*\"".r
+      val sqlNonOptions =new mutable.StringBuilder()
+      val findQuery = new mutable.StringBuilder("Select ")
+      var columns = List[String]("")
+      in.getLines.foreach { line =>
+        val regmatch = optionRegex.findFirstIn(line)
+        regmatch.map(matches => columns = columns ++ List(matches))
+      }
+      columns = columns.drop(1)
+      val maybeNonOptionalColumn = columns.map { str =>
+        val columnname = columnRegex.findFirstIn(str)
+        findQuery ++= columnname.get.dropRight(1).drop(1) + ","
+        columnname
+      }
+      // Gets full object so you can id offending record if PK is optional in code
+      findQuery ++= "* "
+      maybeNonOptionalColumn.foreach{
+        case Some(string) => sqlNonOptions++= string.substring(1,string.length - 1)
+          sqlNonOptions++=" is null OR "
+        case None =>
+      }
+      val orCases = sqlNonOptions.mkString
+      val finalSql = orCases.substring(0,orCases.length -3)
+      val finalQuery = s"${findQuery.mkString.dropRight(1)} from $tableName where $finalSql"
+      println(s"\n\nrunBadDataResourceFile - Setting up Query with outputDir: $outputPath\n\n")
+      println("\\copy (" + finalQuery + s") TO '$outputPath$tableName' HEADER;")
+      println(s"\n\n End of query for resource with outputDir: $outputPath")
+    } catch {
+      case e: Exception =>
+        // TODO Fix try catch to just return on an empty or non-existant resource file
+        println(e.getMessage)
     }
-    columns = columns.drop(1)
-    val maybeNonOptionalColumn = columns.map { str =>
-      val columnname = columnRegex.findFirstIn(str)
-      findQuery ++= columnname.get.dropRight(1).drop(1) + ","
-      columnname
-    }
-    // Gets full object so you can id offending record if PK is optional in code
-    findQuery ++= "* "
-    maybeNonOptionalColumn.foreach{
-      case Some(string) => sqlNonOptions++=(string.substring(1,string.length - 1))
-        sqlNonOptions++=" is null OR "
-      case None =>
-    }
-    val orCases = sqlNonOptions.mkString
-    val finalSql = orCases.substring(0,orCases.length -3)
-    val finalQuery = s"${findQuery.mkString.dropRight(1)} from $tableName where $finalSql"
-    println("\\copy (" +finalQuery + s") TO '$outputPath$tableName' HEADER;")
   }
 
   /**
@@ -146,14 +153,16 @@ class BadDataCheck(){
    *
    * @param absolutePathInput Table to be parsed for the query
    * @param pathOutput        Where the files will be placed for review
-   *                          defaults to /Users/Shared/BadDataOutput/
+   *                          defaults to /Users/Shared/
    */
   def checkSingleFile(absolutePathInput: String,
-                      pathOutput: String = "/Users/Shared/BadDataOutput/"
+                      pathOutput: String = "/Users/Shared/"
                      ): Unit = {
+    println(s"\n\nrunBadData - Setting up Query with absolutePath: $absolutePathInput outputDir: $pathOutput\n\n")
     val file = new File(absolutePathInput)
     val name = getName(file)
     check(name, pathOutput, file)
+    println(s"\n\n END OF QUERY with absolutePath: $absolutePathInput outputDir: $pathOutput")
   }
 }
 
